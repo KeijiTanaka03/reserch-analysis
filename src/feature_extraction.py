@@ -4,7 +4,7 @@ from scipy.fft import rfft, rfftfreq
 from scipy.signal import find_peaks
 
 
-def create_feature_matrix(csi_segments, sampling_rate, use_additional=True):
+def create_feature_matrix(csi_segments, sampling_rate, use_additional=True, feature_list=None):
     """
     CSI分割データから特徴量行列X, ラベルy, 特徴量名feature_namesを作成する関数
 
@@ -12,6 +12,7 @@ def create_feature_matrix(csi_segments, sampling_rate, use_additional=True):
         csi_segments: [ラベル][分割後データ数][CSI]
         sampling_rate: サンプリングレート
         use_additional: Trueなら追加特徴量も含める
+        feature_list: 抽出したい統計特徴量名リスト（例: ["標準偏差", "平均"]）
 
     Returns:
         X: 特徴量行列
@@ -24,8 +25,8 @@ def create_feature_matrix(csi_segments, sampling_rate, use_additional=True):
     for label_idx, label_csi in enumerate(csi_segments):
         for segment in label_csi:
             features = []
+            stat_features_list = extract_features_per_subcarrier(segment, feature_list=feature_list)
             if use_additional:
-                stat_features_list = extract_features_per_subcarrier(segment)
                 add_features_list = extract_additional_features_per_subcarrier(segment, sampling_rate)
                 if not feature_names:
                     for subc_idx, (stat_features, add_features) in enumerate(zip(stat_features_list, add_features_list)):
@@ -37,7 +38,6 @@ def create_feature_matrix(csi_segments, sampling_rate, use_additional=True):
                     features.extend(stat_features.values())
                     features.extend(add_features.values())
             else:
-                stat_features_list = extract_features_per_subcarrier(segment)
                 if not feature_names:
                     for subc_idx, stat_features in enumerate(stat_features_list):
                         for key in stat_features.keys():
@@ -49,35 +49,43 @@ def create_feature_matrix(csi_segments, sampling_rate, use_additional=True):
     return X, y, feature_names
 
 
-def extract_features_per_subcarrier(segment_csi):
+def extract_features_per_subcarrier(segment_csi, feature_list=None):
     """
-    各サブキャリアごとに統計的特徴量（13種類）を抽出する関数
+    各サブキャリアごとに指定した統計的特徴量のみ抽出する関数
 
     Args:
-        segment_csi: [サンプル][サブキャリア] の2次元配列（1分割区間のCSIデータ）
+        segment_csi: [サンプル][サブキャリア] の2次元配列
+        feature_list: 抽出したい特徴量名のリスト（例: ["標準偏差", "平均", ...]）
+            Noneなら全特徴量を抽出
 
     Returns:
         features_per_subc: [サブキャリア][特徴量dict]
-            各サブキャリアごとに特徴量を含むdictのリスト
     """
+
+    # 全特徴量の計算
+    feature_funcs = {
+        "平均": lambda x: float(np.mean(x)),
+        "中央値": lambda x: float(np.median(x)),
+        "標準偏差": lambda x: float(np.std(x)),
+        "最大値": lambda x: float(np.max(x)),
+        "最小値": lambda x: float(np.min(x)),
+        "上四分位値": lambda x: float(np.percentile(x, 75)),
+        "下四分位値": lambda x: float(np.percentile(x, 25)),
+        "四分位範囲": lambda x: float(np.percentile(x, 75) - np.percentile(x, 25)),
+        "平均絶対偏差": lambda x: float(np.mean(np.abs(x - np.mean(x)))),
+        "尖度": lambda x: float(kurtosis(x)) if len(x) > 3 else None,
+        "歪度": lambda x: float(skew(x)) if len(x) > 2 else None,
+        "自己相関": lambda x: float(np.corrcoef(x[:-1], x[1:])[0, 1]) if len(x) > 1 else None,
+        "二乗平均平方根": lambda x: float(np.sqrt(np.mean(x ** 2))),
+    }
+
+    if feature_list is None:
+        feature_list = list(feature_funcs.keys())
+
     segment_csi = np.array(segment_csi)
     features_per_subc = []
     for subc in segment_csi.T:
-        features = {
-            "平均": float(np.mean(subc)),
-            "中央値": float(np.median(subc)),
-            "標準偏差": float(np.std(subc)),
-            "最大値": float(np.max(subc)),
-            "最小値": float(np.min(subc)),
-            "上四分位値": float(np.percentile(subc, 75)),
-            "下四分位値": float(np.percentile(subc, 25)),
-            "四分位範囲": float(np.percentile(subc, 75) - np.percentile(subc, 25)),
-            "平均絶対偏差": float(np.mean(np.abs(subc - np.mean(subc)))),
-            "尖度": float(kurtosis(subc)) if len(subc) > 3 else None,
-            "歪度": float(skew(subc)) if len(subc) > 2 else None,
-            "自己相関": float(np.corrcoef(subc[:-1], subc[1:])[0, 1]) if len(subc) > 1 else None,
-            "二乗平均平方根": float(np.sqrt(np.mean(subc ** 2)))
-        }
+        features = {name: func(subc) for name, func in feature_funcs.items() if name in feature_list}
         features_per_subc.append(features)
     return features_per_subc
 
