@@ -4,7 +4,7 @@ from scipy.fft import rfft, rfftfreq
 from scipy.signal import find_peaks
 
 
-def create_feature_matrix(csi_segments, sampling_rate, use_additional=True, feature_list=None):
+def create_feature_matrix(csi_segments, sampling_rate, use_additional=False, feature_list=None):
     """
     CSI分割データから特徴量行列X, ラベルy, 特徴量名feature_namesを作成する関数
 
@@ -142,3 +142,43 @@ def extract_additional_features_per_subcarrier(segment_csi, sampling_rate):
             features['ピーク間隔平均'] = None
         features_per_subc.append(features)
     return features_per_subc
+
+
+def extract_features_from_segments(csi_segments, sampling_rate, feature_list=None):
+    """
+    リスト[ラベル][分割後データ数][CSI]から特徴量を抽出する関数
+
+    Args:
+        csi_segments: [ラベル][分割後データ数][CSI]
+        sampling_rate: サンプリングレート
+        feature_list: 抽出したい統計特徴量名リスト（例: ["標準偏差", "平均"]）
+
+    Returns:
+        X: 特徴量行列
+        y: ラベルリスト
+        feature_names: 特徴量名リスト
+    """
+    X = []
+    y = []
+    feature_names = []
+
+    for label_idx, label_segments in enumerate(csi_segments):
+        for segment in label_segments:
+            features = []
+            # 各サブキャリアごとに特徴量を抽出
+            stat_features_list = extract_features_per_subcarrier(segment, feature_list=feature_list)
+            
+            # 特徴量名を初期化（最初の1回のみ）
+            if not feature_names:
+                for subc_idx, stat_features in enumerate(stat_features_list):
+                    for key in stat_features.keys():
+                        feature_names.append(f"subc{subc_idx}_{key}")
+            
+            # 特徴量をリストに追加
+            for stat_features in stat_features_list:
+                features.extend(stat_features.values())
+            
+            X.append(features)
+            y.append(label_idx)
+    
+    return X, y, feature_names

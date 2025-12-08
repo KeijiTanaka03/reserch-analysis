@@ -6,9 +6,9 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, classification_report
 import joblib
 
-from data_utils import *
-from preprocess import *
-from feature_extraction import *
+from utils.data_utils import *
+from utils.preprocess import *
+from utils.feature_extraction import *
 
 # --- 定数 ---
 LABEL_COUNT = 18

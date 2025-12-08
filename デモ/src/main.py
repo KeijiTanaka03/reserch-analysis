@@ -6,9 +6,9 @@ import os
 sys.path.append(os.path.abspath("../../src"))
 
 from analysis import *
-from data_utils import *
-from preprocess import *
-from feature_extraction import *
+from utils.data_utils import *
+from utils.preprocess import *
+from utils.feature_extraction import *
 
 # -------------------- グローバル初期化 --------------------
 import joblib
@@ -223,7 +223,9 @@ def main():
     while True:
         ret, frame = cap.read()
         if not ret:
-            break
+            # 動画が終了したら最初に戻る
+            cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            continue
 
         # 磨いている箇所に色付け（正解）
         current_frame = int(cap.get(cv2.CAP_PROP_POS_FRAMES))

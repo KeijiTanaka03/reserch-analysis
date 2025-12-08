@@ -1,10 +1,41 @@
+import numpy as np
 from scipy.signal import butter, filtfilt
 from scipy.signal import medfilt
 import matplotlib.pyplot as plt
 
 
+def correct_phase_rotation(row_phase):
+    """
+    row_phaseの位相回転を補正する。
+
+    Args:
+        row_phase: [ラベル][ファイル][行][サブキャリア値(位相)]
+
+    Returns:
+        corrected_phase: 位相回転を補正したデータ
+    """
+    corrected_phase = []
+    for label_phase in row_phase:
+        corrected_label_phase = []
+        for file_phase in label_phase:
+            corrected_file_phase = []
+            for phase in file_phase:
+                # 位相のアンラップ
+                unwrapped_phase = np.unwrap(phase)
+                # 線形トレンドの計算
+                subcarriers = np.arange(len(unwrapped_phase))
+                coef = np.polyfit(subcarriers, unwrapped_phase, 1)
+                trend = np.polyval(coef, subcarriers)
+                # トレンドを除去して補正
+                corrected_phase_row = unwrapped_phase - trend
+                corrected_file_phase.append(corrected_phase_row)
+            corrected_label_phase.append(corrected_file_phase)
+        corrected_phase.append(corrected_label_phase)
+    return corrected_phase
+
+
 def butter_lowpass_filter_csi(csi_data, sampling_rate, cutoff=10, order=4,
-                              label_idx=0, file_idx=0, subc_idx=0):
+                              label_idx=0, file_idx=0, subc_idx=10):
     """
     CSIデータ全体にバターワースローパスフィルタを適用し、フィルタ前後のプロットも返す
     
@@ -46,7 +77,7 @@ def butter_lowpass_filter_csi(csi_data, sampling_rate, cutoff=10, order=4,
 
 
 def median_filter_csi(csi_data, kernel_size=3, 
-                      label_idx=0, file_idx=0, subc_idx=0):
+                      label_idx=0, file_idx=0, subc_idx=10):
     """
     CSIデータ全体にメディアンフィルタを適用し、フィルタ前後のプロットも返す
 
