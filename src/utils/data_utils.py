@@ -192,7 +192,7 @@ def remove_zero_subcarriers(csi_data):
 
     original_subcarriers = all_csi.shape[1] 
     new_subcarriers = len(valid_indices)
-    return new_csi_data, original_subcarriers, new_subcarriers
+    return new_csi_data
 
 
 """
